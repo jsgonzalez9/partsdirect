@@ -36,7 +36,7 @@ export async function GET(req: Request) {
   </url>`).join('')}
   ${symptomSlugs.map(slug => `
   <url>
-    <loc>${baseUrl}/symptom/${slug}</loc>
+    <loc>${baseUrl}/symptoms/${slug}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
