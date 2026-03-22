@@ -43,8 +43,8 @@ export default async function SymptomPage({ params }: SymptomPageProps) {
     notFound();
   }
 
-  const parts = page.seo_page_parts?.map((p: any) => p.parts) || [];
-  const firstPart = parts[0] || { name: 'Replacement Part', price: 0, brand: 'OEM' };
+  const parts = (page.seo_page_parts?.map((p: any) => p.parts) || []).filter(Boolean);
+  const firstPart = parts[0] || { name: 'Replacement Component', price: 0, brand: 'OEM-SPEC', category: 'General', part_number: 'diagnostic-required' };
 
   return (
     <div className="min-h-screen bg-white text-zinc-900">
