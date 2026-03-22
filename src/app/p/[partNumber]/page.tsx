@@ -1,4 +1,4 @@
-import { STATIC_PARTS, getPartByNumber } from "@/lib/static-data";
+import { getPartByNumber } from "@/lib/supabase";
 import { notFound } from "next/navigation";
 import { PriceComparison } from "@/components/PriceComparison";
 import { Badge } from "@/components/ui/badge";
@@ -11,21 +11,24 @@ interface PartPageProps {
   }>;
 }
 
-export async function generateStaticParams() {
-  return STATIC_PARTS.map((part) => ({
-    partNumber: part.part_number,
-  }));
-}
-
 export default async function PartPage({ params }: PartPageProps) {
   const { partNumber } = await params;
-  const part = getPartByNumber(partNumber);
+  
+  let part;
+  try {
+    part = await getPartByNumber(partNumber);
+  } catch (error) {
+    console.error('Error fetching part:', error);
+    notFound();
+  }
 
   if (!part) {
     notFound();
   }
 
-  const bestPrice = part.prices.sort((a, b) => (a.price + a.shipping) - (b.price + b.shipping))[0];
+  // Handle the case where prices might be empty or missing
+  const prices = part.prices || [];
+  const bestPrice = [...prices].sort((a, b) => (a.price + (a.shipping_cost || 0)) - (b.price + (b.shipping_cost || 0)))[0];
 
   return (
     <div className="min-h-screen bg-[#121212] text-white">
@@ -80,31 +83,26 @@ export default async function PartPage({ params }: PartPageProps) {
               </div>
 
               {/* Symptoms Section */}
-              {part.symptoms.length > 0 && (
+              {part.failures && part.failures.length > 0 && (
                 <div className="mt-6 p-4 bg-[#1e1e1e] border border-[#333333] rounded-lg">
                   <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
                     <AlertTriangle className="text-amber-500" size={20} />
                     Common Symptoms
                   </h3>
                   <div className="space-y-3">
-                    {part.symptoms.map((symptom, idx) => (
+                    {part.failures.map((failure, idx) => (
                       <div key={idx} className="flex items-start gap-3 p-3 bg-[#2a2a2a] rounded">
                         <div className={`w-2 h-2 rounded-full mt-2 ${
-                          symptom.severity === 'Critical' ? 'bg-red-500' :
-                          symptom.severity === 'High' ? 'bg-orange-500' :
-                          symptom.severity === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'
+                          failure.severity_score >= 8 ? 'bg-red-500' :
+                          failure.severity_score >= 5 ? 'bg-orange-500' : 'bg-yellow-500'
                         }`} />
                         <div className="flex-1">
-                          <p className="font-medium">{symptom.description}</p>
+                          <p className="font-medium">{failure.symptom}</p>
                           <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
-                            <span className={`
-                              ${symptom.urgency === 'ASAP' ? 'text-red-400' : ''}
-                              ${symptom.urgency === 'Soon' ? 'text-yellow-400' : ''}
-                              ${symptom.urgency === 'DIY' ? 'text-green-400' : ''}
-                            `}>
-                              {symptom.urgency}
+                            <span className={failure.urgency_score >= 8 ? 'text-red-400' : ''}>
+                              Urgency: {failure.urgency_score}/10
                             </span>
-                            <span>{symptom.drivable ? '✓ Safe to drive' : '✗ Do not drive'}</span>
+                            <span>{failure.drivable ? '✓ Safe to drive' : '✗ Do not drive'}</span>
                           </div>
                         </div>
                       </div>
@@ -114,28 +112,26 @@ export default async function PartPage({ params }: PartPageProps) {
               )}
 
               {/* Install Info */}
-              <div className="mt-6 p-4 bg-[#1e1e1e] border border-[#333333] rounded-lg">
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <Wrench className="text-[#f96706]" size={20} />
-                  Installation
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Difficulty</p>
-                    <p className="font-medium">{part.install.skill_level}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Time</p>
-                    <p className="font-medium flex items-center gap-1">
-                      <Clock size={14} /> {part.install.labor_hours} hours
-                    </p>
+              {part.install_info && part.install_info[0] && (
+                <div className="mt-6 p-4 bg-[#1e1e1e] border border-[#333333] rounded-lg">
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <Wrench className="text-[#f96706]" size={20} />
+                    Installation
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Difficulty</p>
+                      <p className="font-medium">{part.install_info[0].skill_level}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Time</p>
+                      <p className="font-medium flex items-center gap-1">
+                        <Clock size={14} /> {part.install_info[0].labor_hours || '1-2'} hours
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <div className="mt-3">
-                  <p className="text-sm text-gray-500">Tools needed:</p>
-                  <p className="text-sm">{part.install.tools.join(', ')}</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -156,22 +152,24 @@ export default async function PartPage({ params }: PartPageProps) {
                 View Best Price
               </Button>
 
-              <a 
-                href={bestPrice?.url || '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full"
-              >
-                <Button
-                  variant="outline"
-                  className="w-full border-[#333333] text-white hover:bg-[#2a2a2a] h-12"
+              {bestPrice && (
+                <a 
+                  href={bestPrice.affiliate_link || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full"
                 >
-                  Check {bestPrice?.retailer || 'Retailers'}
-                </Button>
-              </a>
+                  <Button
+                    variant="outline"
+                    className="w-full border-[#333333] text-white hover:bg-[#2a2a2a] h-12"
+                  >
+                    Check {bestPrice.retailer}
+                  </Button>
+                </a>
+              )}
             </div>
 
-            <PriceComparison prices={part.prices} />
+            {prices.length > 0 && <PriceComparison prices={prices} />}
 
             {/* Mechanic Lead Gen */}
             <div className="bg-gradient-to-br from-[#f96706]/20 to-[#f96706]/5 border border-[#f96706]/30 rounded-lg p-6">
@@ -185,20 +183,10 @@ export default async function PartPage({ params }: PartPageProps) {
                   placeholder="Enter ZIP code"
                   className="w-full bg-[#121212] border border-[#333333] rounded px-4 py-3 text-white placeholder:text-gray-500"
                 />
-                <select className="w-full bg-[#121212] border border-[#333333] rounded px-4 py-3 text-white"
-                >
-                  <option>When do you need it?</option>
-                  <option>ASAP - Won't start</option>
-                  <option>Soon - Within a week</option>
-                  <option>DIY - Just comparing prices</option>
-                </select>
                 <Button className="w-full bg-white text-black hover:bg-gray-200 h-12">
                   Get Free Quotes
                 </Button>
               </div>
-              <p className="text-xs text-gray-500 mt-3 text-center">
-                Average response time: 15 minutes
-              </p>
             </div>
           </div>
         </div>
