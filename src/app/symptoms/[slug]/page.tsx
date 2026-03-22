@@ -61,9 +61,9 @@ export default async function SymptomPage({ params }: SymptomPageProps) {
           {/* Hero Section */}
           <div className="mb-12">
             <h1 className="text-4xl md:text-5xl font-black tracking-tighter mb-4 leading-tight">
-              {page.title}
+              {page.h1_title}
             </h1>
-            <div className="prose max-w-none text-xl text-zinc-500 mb-8" dangerouslySetInnerHTML={{ __html: page.content }} />
+            <div className="prose max-w-none text-xl text-zinc-500 mb-8" dangerouslySetInnerHTML={{ __html: page.content_body }} />
           </div>
 
           {/* Lead Gen Box */}
