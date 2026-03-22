@@ -47,8 +47,8 @@ export async function GET(req: Request) {
         'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=59'
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Sitemap generation error:', error);
-    return new Response('Error generating sitemap', { status: 500 });
+    return new Response(`Error generating sitemap: ${error.message || JSON.stringify(error)}`, { status: 500 });
   }
 }
